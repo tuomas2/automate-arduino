@@ -23,7 +23,7 @@ setupopts = dict(
     long_description="This Automate extension provides interface to Arduino devices via pyFirmata library.",
     license="GPL",
     keywords="automation, GPIO, Raspberry Pi, RPIO, traits",
-    url="http://github.com/tuomas2/automate_webui",
+    url="http://github.com/tuomas2/automate-arduino",
     entry_points={'automate.extension': [
             'arduino = automate_arduino:extension_classes'
     ]},
