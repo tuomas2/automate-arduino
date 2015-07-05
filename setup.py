@@ -11,7 +11,7 @@ def get_version(filename):
         return metadata['version']
 
 setupopts = dict(
-    name="automate_arduino",
+    name="automate-arduino",
     version=get_version('automate_arduino/__init__.py'),
     packages=find_packages(),
 
