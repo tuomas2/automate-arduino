@@ -40,10 +40,12 @@ setupopts = dict(
                  "License :: OSI Approved :: GNU General Public License (GPL)",
                  "Operating System :: Microsoft :: Windows",
                  "Operating System :: POSIX",
+                 "Operating System :: POSIX :: Linux",
                  "Programming Language :: Python :: 2.7",
                  "Topic :: Scientific/Engineering",
                  "Topic :: Software Development",
-                 "Topic :: Software Development :: Libraries"]
+                 "Topic :: Software Development :: Libraries",
+                 ]
 )
 
 if __name__ == "__main__":
