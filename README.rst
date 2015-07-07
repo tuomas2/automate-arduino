@@ -1,9 +1,8 @@
-Arduino Support for Automate
-============================
+Arduino Support for `Automate <http://github.com/tuomas2/automate>`_
+====================================================================
 
-Automate is a general purpose Python automatization library.
-Read the documentation at
-http://python-automate.readthedocs.org/en/latest/official_extensions/arduino.html
+Read the full documentation at
+`Readthedocs.org <http://python-automate.readthedocs.org/en/latest/official_extensions/arduino.html>`_.
 
 Licence
 -------
