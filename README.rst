@@ -4,6 +4,19 @@ Arduino Support for `Automate <http://github.com/tuomas2/automate>`_
 Read the full documentation at
 `Readthedocs.org <http://python-automate.readthedocs.org/en/latest/official_extensions/arduino.html>`_.
 
+Installation
+------------
+
+Install from Pypi::
+
+    pip install automate-arduino
+
+Optionally, you could install also by cloning GIT repository and installing manually::
+
+    git clone https://github.com/tuomas2/automate-arduino.git
+    cd automate-arduino
+    ./setup.py install
+
 Licence
 -------
 
