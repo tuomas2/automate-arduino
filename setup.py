@@ -17,7 +17,7 @@ setupopts = dict(
     install_requires=[
         "automate>=0.9.2,<0.10",
         "pyfirmata==1.0.3",
-        "mock==1.0.1"],
+        "mock==1.3.0"],
     author="Tuomas Airaksinen",
     author_email="tuomas.airaksinen@gmail.com",
     description="Arduino Support for Automate",
