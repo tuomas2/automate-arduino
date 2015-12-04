@@ -19,6 +19,8 @@
 import os
 import threading
 
+from builtins import range
+
 from automate import Lock
 from traits.api import HasTraits, Any, Dict, CList, Str, Int, List
 from automate.service import AbstractSystemService
@@ -96,7 +98,7 @@ class ArduinoService(AbstractSystemService):
         class FileNotReadableError(Exception):
             pass
 
-        for i in xrange(len(ard_devs)):
+        for i in range(len(ard_devs)):
             try:
                 if not os.access(ard_devs[i], os.R_OK):
                     raise FileNotReadableError
