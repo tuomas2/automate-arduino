@@ -29,11 +29,15 @@ from automate.service import AbstractSystemService
 
 logger = logging.getLogger('automate.arduino_service')
 
+
 def patch_pyfirmata():
     """ Patch Pin class in pyfirmata to have Traits. Particularly, we need notification
         for value changes in Pins. """
 
     import pyfirmata
+    if hasattr(pyfirmata, 'patched'):
+        return
+
     PinOld = pyfirmata.Pin
 
     class Pin(PinOld, HasTraits):
@@ -49,8 +53,7 @@ def patch_pyfirmata():
     pyfirmata.Pin = Pin
     pyfirmata.pyfirmata.Pin = Pin
 
-    import pyfirmata.util
-    OldIterator = pyfirmata.util.Iterator
+    from pyfirmata.util import Iterator as OldIterator
 
     class FixedPyFirmataIterator(OldIterator):
 
@@ -61,7 +64,8 @@ def patch_pyfirmata():
                 logger.error('Exception %s occurred in Pyfirmata iterator, quitting now', e)
                 logger.error('threads: %s', threading.enumerate())
 
-    pyfirmata.util.Iterator = FixedPyFirmataIterator
+    pyfirmata.util.Iterator.Fixed = FixedPyFirmataIterator
+    pyfirmata.patched = True
 
 
 class ArduinoService(AbstractSystemService):
@@ -109,7 +113,6 @@ class ArduinoService(AbstractSystemService):
         samplerates = self.arduino_dev_sampling
         assert len(ard_devs) == len(ard_types) == len(samplerates), 'Arduino configuration invalid!'
 
-
         for i in range(len(ard_devs)):
             try:
                 if not os.access(ard_devs[i], os.R_OK):
@@ -117,7 +120,7 @@ class ArduinoService(AbstractSystemService):
                 cls = getattr(pyfirmata, ard_types[i])
                 board = cls(ard_devs[i])
                 board.send_sysex(pyfirmata.SAMPLING_INTERVAL, to_two_bytes(samplerates[i]))
-                self._iterator_thread = it = Iterator(board)
+                self._iterator_thread = it = Iterator.Fixed(board)
                 it.name = "PyFirmata thread for {dev}".format(dev=ard_devs[i])
                 it.start()
                 board._iter = it
