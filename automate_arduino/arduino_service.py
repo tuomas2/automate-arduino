@@ -124,8 +124,9 @@ class ArduinoService(AbstractSystemService):
         for board in self._boards:
             if board:
                 board.exit()
-        if self._iterator:
+        if self._iterator and self._iterator.is_alive():
             self._iterator.board = None
+            self._iterator.join()
 
     def setup_digital(self, dev, pin_nr):
         if not self._boards[dev]:
