@@ -19,6 +19,7 @@
 from __future__ import unicode_literals
 import os
 import threading
+import logging
 
 from builtins import range
 
@@ -26,6 +27,7 @@ from automate import Lock
 from traits.api import HasTraits, Any, Dict, CList, Str, Int, List
 from automate.service import AbstractSystemService
 
+logger = logging.getLogger('automate.arduino_service')
 
 def patch_pyfirmata():
         """ Patch Pin class in pyfirmata to have Traits. Particularly, we need notification
@@ -46,6 +48,20 @@ def patch_pyfirmata():
 
         pyfirmata.Pin = Pin
         pyfirmata.pyfirmata.Pin = Pin
+
+        import pyfirmata.util
+        OldIterator = pyfirmata.util.Iterator
+
+        class FixedPyFirmataIterator(OldIterator):
+
+            def run(iter_self):
+                try:
+                    super(FixedPyFirmataIterator, iter_self).run()
+                except Exception as e:
+                    logger.error('Exception %s occurred in Pyfirmata iterator, quitting now', e)
+                    logger.error('threads: %s', threading.enumerate())
+
+        pyfirmata.util.Iterator = FixedPyFirmataIterator
 
 
 class ArduinoService(AbstractSystemService):
@@ -85,19 +101,7 @@ class ArduinoService(AbstractSystemService):
             return
 
         patch_pyfirmata()
-
-        import pyfirmata.util
-
-        # Patching also Iterator as it does not quit cleanly when exiting.
-
-        class FixedPyFirmataIterator(pyfirmata.util.Iterator):
-
-            def run(iter_self):
-                try:
-                    super(FixedPyFirmataIterator, iter_self).run()
-                except Exception as e:
-                    self.logger.error('Exception %s occurred in Pyfirmata iterator, quitting now', e)
-                    self.logger.error('threads: %s', threading.enumerate())
+        from pyfirmata.util import Iterator, to_two_bytes
 
         # Initialize configured self.boards
         ard_devs = self.arduino_devs
@@ -112,8 +116,8 @@ class ArduinoService(AbstractSystemService):
                     raise self.FileNotReadableError
                 cls = getattr(pyfirmata, ard_types[i])
                 board = cls(ard_devs[i])
-                board.send_sysex(pyfirmata.SAMPLING_INTERVAL, pyfirmata.util.to_two_bytes(samplerates[i]))
-                self._iterator_thread = it = FixedPyFirmataIterator(board)
+                board.send_sysex(pyfirmata.SAMPLING_INTERVAL, to_two_bytes(samplerates[i]))
+                self._iterator_thread = it = Iterator(board)
                 it.name = "PyFirmata thread for {dev}".format(dev=ard_devs[i])
                 it.start()
                 board._iter = it
@@ -135,6 +139,16 @@ class ArduinoService(AbstractSystemService):
             self._iterator_thread.board = None
             self._iterator_thread.join()
             self._iterator_thread = None
+
+    def reload(self):
+        super(ArduinoService, self).reload()
+        # Restore subscriptions
+        for (dev, pin_nr), (sens, pin) in self._sens_digital.items():
+            self.unsubscribe_digital(dev, pin_nr)
+            self.subscribe_digital(dev, pin_nr, sens)
+        for (dev, pin_nr), (sens, pin) in self._sens_analog.items():
+            self.unsubscribe_analog(dev, pin_nr)
+            self.subscribe_analog(dev, pin_nr, sens)
 
     def setup_digital(self, dev, pin_nr):
         if not self._boards[dev]:
