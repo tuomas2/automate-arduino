@@ -27,6 +27,27 @@ from traits.api import HasTraits, Any, Dict, CList, Str, Int, List
 from automate.service import AbstractSystemService
 
 
+def patch_pyfirmata():
+        """ Patch Pin class in pyfirmata to have Traits. Particularly, we need notification
+            for value changes in Pins. """
+
+        import pyfirmata
+        PinOld = pyfirmata.Pin
+
+        class Pin(PinOld, HasTraits):
+            mode = property(PinOld._get_mode, PinOld._set_mode)
+
+            def __init__(self, *args, **kwargs):
+                HasTraits.__init__(self)
+                self.add_trait("value", Any)
+                PinOld.__init__(self, *args, **kwargs)
+
+        import pyfirmata.pyfirmata
+
+        pyfirmata.Pin = Pin
+        pyfirmata.pyfirmata.Pin = Pin
+
+
 class ArduinoService(AbstractSystemService):
 
     """
@@ -50,7 +71,10 @@ class ArduinoService(AbstractSystemService):
     _act_digital = Dict
     _boards = List
     _locks = List
-    _iterator = Any
+    _iterator_thread = Any
+
+    class FileNotReadableError(Exception):
+        pass
 
     def setup(self):
         self.logger.debug("Initializing Arduino subsystem")
@@ -60,22 +84,7 @@ class ArduinoService(AbstractSystemService):
             self.logger.error("Please install pyfirmata if you want to use Arduino interface")
             return
 
-        # Patch Pin class in pyfirmata to have Traits. Particularly, we need notification for value changes in Pins.
-
-        PinOld = pyfirmata.Pin
-
-        class Pin(PinOld, HasTraits):
-            mode = property(PinOld._get_mode, PinOld._set_mode)
-
-            def __init__(self, *args, **kwargs):
-                HasTraits.__init__(self)
-                self.add_trait("value", Any)
-                PinOld.__init__(self, *args, **kwargs)
-
-        import pyfirmata.pyfirmata
-
-        pyfirmata.Pin = Pin
-        pyfirmata.pyfirmata.Pin = Pin
+        patch_pyfirmata()
 
         import pyfirmata.util
 
@@ -96,23 +105,21 @@ class ArduinoService(AbstractSystemService):
         samplerates = self.arduino_dev_sampling
         assert len(ard_devs) == len(ard_types) == len(samplerates), 'Arduino configuration invalid!'
 
-        class FileNotReadableError(Exception):
-            pass
 
         for i in range(len(ard_devs)):
             try:
                 if not os.access(ard_devs[i], os.R_OK):
-                    raise FileNotReadableError
+                    raise self.FileNotReadableError
                 cls = getattr(pyfirmata, ard_types[i])
                 board = cls(ard_devs[i])
                 board.send_sysex(pyfirmata.SAMPLING_INTERVAL, pyfirmata.util.to_two_bytes(samplerates[i]))
-                self._iterator = it = FixedPyFirmataIterator(board)
+                self._iterator_thread = it = FixedPyFirmataIterator(board)
                 it.name = "PyFirmata thread for {dev}".format(dev=ard_devs[i])
                 it.start()
                 board._iter = it
                 self._boards.append(board)
-            except (FileNotReadableError, OSError) as e:
-                if isinstance(e, FileNotReadableError) or e.errno == os.errno.ENOENT:
+            except (self.FileNotReadableError, OSError) as e:
+                if isinstance(e, self.FileNotReadableError) or e.errno == os.errno.ENOENT:
                     self.logger.warning('Your arduino device %s is not available. Arduino will be mocked.', ard_devs[i])
                     self._boards.append(None)
                 else:
@@ -124,9 +131,10 @@ class ArduinoService(AbstractSystemService):
         for board in self._boards:
             if board:
                 board.exit()
-        if self._iterator and self._iterator.is_alive():
-            self._iterator.board = None
-            self._iterator.join()
+        if self._iterator_thread and self._iterator_thread.is_alive():
+            self._iterator_thread.board = None
+            self._iterator_thread.join()
+            self._iterator_thread = None
 
     def setup_digital(self, dev, pin_nr):
         if not self._boards[dev]:
