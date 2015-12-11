@@ -30,38 +30,38 @@ from automate.service import AbstractSystemService
 logger = logging.getLogger('automate.arduino_service')
 
 def patch_pyfirmata():
-        """ Patch Pin class in pyfirmata to have Traits. Particularly, we need notification
-            for value changes in Pins. """
+    """ Patch Pin class in pyfirmata to have Traits. Particularly, we need notification
+        for value changes in Pins. """
 
-        import pyfirmata
-        PinOld = pyfirmata.Pin
+    import pyfirmata
+    PinOld = pyfirmata.Pin
 
-        class Pin(PinOld, HasTraits):
-            mode = property(PinOld._get_mode, PinOld._set_mode)
+    class Pin(PinOld, HasTraits):
+        mode = property(PinOld._get_mode, PinOld._set_mode)
 
-            def __init__(self, *args, **kwargs):
-                HasTraits.__init__(self)
-                self.add_trait("value", Any)
-                PinOld.__init__(self, *args, **kwargs)
+        def __init__(self, *args, **kwargs):
+            HasTraits.__init__(self)
+            self.add_trait("value", Any)
+            PinOld.__init__(self, *args, **kwargs)
 
-        import pyfirmata.pyfirmata
+    import pyfirmata.pyfirmata
 
-        pyfirmata.Pin = Pin
-        pyfirmata.pyfirmata.Pin = Pin
+    pyfirmata.Pin = Pin
+    pyfirmata.pyfirmata.Pin = Pin
 
-        import pyfirmata.util
-        OldIterator = pyfirmata.util.Iterator
+    import pyfirmata.util
+    OldIterator = pyfirmata.util.Iterator
 
-        class FixedPyFirmataIterator(OldIterator):
+    class FixedPyFirmataIterator(OldIterator):
 
-            def run(iter_self):
-                try:
-                    super(FixedPyFirmataIterator, iter_self).run()
-                except Exception as e:
-                    logger.error('Exception %s occurred in Pyfirmata iterator, quitting now', e)
-                    logger.error('threads: %s', threading.enumerate())
+        def run(iter_self):
+            try:
+                super(FixedPyFirmataIterator, iter_self).run()
+            except Exception as e:
+                logger.error('Exception %s occurred in Pyfirmata iterator, quitting now', e)
+                logger.error('threads: %s', threading.enumerate())
 
-        pyfirmata.util.Iterator = FixedPyFirmataIterator
+    pyfirmata.util.Iterator = FixedPyFirmataIterator
 
 
 class ArduinoService(AbstractSystemService):
