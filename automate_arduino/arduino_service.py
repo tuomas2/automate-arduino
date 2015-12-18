@@ -35,7 +35,7 @@ def patch_pyfirmata():
         for value changes in Pins. """
 
     import pyfirmata
-    if hasattr(pyfirmata, 'patched'):
+    if getattr(pyfirmata, 'patched', False):
         return
 
     PinOld = pyfirmata.Pin
@@ -135,7 +135,8 @@ class ArduinoService(AbstractSystemService):
 
     def cleanup(self):
         self.logger.debug("Cleaning up Arduino subsystem. ")
-        for board in self._boards:
+        while self._boards:
+            board = self._boards.pop()
             if board:
                 board.exit()
         if self._iterator_thread and self._iterator_thread.is_alive():
