@@ -145,13 +145,17 @@ class ArduinoService(AbstractSystemService):
             self._iterator_thread = None
 
     def reload(self):
+        digital_items = list(self._sens_digital.items())
+        analog_items = list(self._sens_digital.items())
+        for (dev, pin_nr), (sens, pin) in digital_items:
+            self.unsubscribe_digital(dev, pin_nr)
+        for (dev, pin_nr), (sens, pin) in analog_items:
+            self.unsubscribe_analog(dev, pin_nr)
         super(ArduinoService, self).reload()
         # Restore subscriptions
-        for (dev, pin_nr), (sens, pin) in self._sens_digital.items():
-            self.unsubscribe_digital(dev, pin_nr)
+        for (dev, pin_nr), (sens, pin) in digital_items:
             self.subscribe_digital(dev, pin_nr, sens)
-        for (dev, pin_nr), (sens, pin) in self._sens_analog.items():
-            self.unsubscribe_analog(dev, pin_nr)
+        for (dev, pin_nr), (sens, pin) in analog_items:
             self.subscribe_analog(dev, pin_nr, sens)
 
     def setup_digital(self, dev, pin_nr):
