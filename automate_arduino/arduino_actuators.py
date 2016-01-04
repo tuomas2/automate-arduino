@@ -58,7 +58,7 @@ class ArduinoDigitalActuator(AbstractArduinoActuator):
         self._arduino.change_digital(self.dev, self.pin, self._status)
 
     def cleanup(self):
-        self._arduino.unsubscribe_digital(self.dev, self.pin)
+        self._arduino.cleanup_digital_actuator(self.dev, self.pin)
 
 
 class ArduinoServoActuator(AbstractArduinoActuator):
@@ -94,6 +94,8 @@ class ArduinoServoActuator(AbstractArduinoActuator):
         self.logger.debug("change_servo %s %s %s", self.dev, self.pin, int(round(self._status)))
         self._arduino.change_digital(self.dev, self.pin, int(round(self._status)))
 
+    def cleanup(self):
+        self._arduino.cleanup_digital_actuator(self.dev, self.pin)
 
 class ArduinoPWMActuator(FloatActuator, AbstractArduinoActuator):
 
@@ -108,3 +110,6 @@ class ArduinoPWMActuator(FloatActuator, AbstractArduinoActuator):
 
     def _status_changed(self):
         self._arduino.change_digital(self.dev, self.pin, max(0., min(1., self._status)))
+
+    def cleanup(self):
+        self._arduino.cleanup_digital_actuator(self.dev, self.pin)

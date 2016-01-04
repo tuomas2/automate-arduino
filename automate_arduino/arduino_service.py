@@ -20,6 +20,7 @@ from __future__ import unicode_literals
 import os
 import threading
 import logging
+from collections import namedtuple
 
 from builtins import range
 
@@ -29,6 +30,7 @@ from automate.service import AbstractSystemService
 
 logger = logging.getLogger('automate.arduino_service')
 
+PinTuple = namedtuple('PinTuple', ['type', 'pin'])
 
 def patch_pyfirmata():
     """ Patch Pin class in pyfirmata to have Traits. Particularly, we need notification
@@ -87,7 +89,6 @@ class ArduinoService(AbstractSystemService):
 
     _sens_analog = Dict
     _sens_digital = Dict
-    _act_analog = Dict
     _act_digital = Dict
     _boards = List
     _locks = List
@@ -122,8 +123,8 @@ class ArduinoService(AbstractSystemService):
                 board.send_sysex(pyfirmata.SAMPLING_INTERVAL, to_two_bytes(samplerates[i]))
                 self._iterator_thread = it = Iterator.Fixed(board)
                 it.name = "PyFirmata thread for {dev}".format(dev=ard_devs[i])
-                it.start()
                 board._iter = it
+                it.start()
                 self._boards.append(board)
             except (self.FileNotReadableError, OSError) as e:
                 if isinstance(e, self.FileNotReadableError) or e.errno == os.errno.ENOENT:
@@ -145,39 +146,50 @@ class ArduinoService(AbstractSystemService):
             self._iterator_thread = None
 
     def reload(self):
-        digital_items = list(self._sens_digital.items())
-        analog_items = list(self._sens_digital.items())
-        for (dev, pin_nr), (sens, pin) in digital_items:
+        digital_sensors = list(self._sens_digital.items())
+        analog_sensors = list(self._sens_analog.items())
+        digital_actuators = list(self._act_digital.items())
+
+        for (dev, pin_nr), (_type, pin) in digital_actuators:
+            self.cleanup_digital_actuator(dev, pin_nr)
+
+        for (dev, pin_nr), (sens, pin) in digital_sensors:
             self.unsubscribe_digital(dev, pin_nr)
-        for (dev, pin_nr), (sens, pin) in analog_items:
+        for (dev, pin_nr), (sens, pin) in analog_sensors:
             self.unsubscribe_analog(dev, pin_nr)
         super(ArduinoService, self).reload()
         # Restore subscriptions
-        for (dev, pin_nr), (sens, pin) in digital_items:
+        for (dev, pin_nr), (sens, pin) in digital_sensors:
             self.subscribe_digital(dev, pin_nr, sens)
-        for (dev, pin_nr), (sens, pin) in analog_items:
+        for (dev, pin_nr), (sens, pin) in analog_sensors:
             self.subscribe_analog(dev, pin_nr, sens)
+
+        for (dev, pin_nr), (_type, pin) in digital_actuators:
+            setup_func = {'p': self.setup_pwm, 'd': self.setup_digital}.get(_type)
+            if setup_func:
+                setup_func(dev, pin_nr)
+            #TODO: servo reload!
 
     def setup_digital(self, dev, pin_nr):
         if not self._boards[dev]:
             return
         with self._locks[dev]:
             pin = self._boards[dev].get_pin("d:{pin}:o".format(pin=pin_nr))
-            self._act_digital[(dev, pin_nr)] = pin
+            self._act_digital[(dev, pin_nr)] = PinTuple('o', pin)
 
     def setup_pwm(self, dev, pin_nr):
         if not self._boards[dev]:
             return
         with self._locks[dev]:
             pin = self._boards[dev].get_pin("d:{pin}:p".format(pin=pin_nr))
-            self._act_digital[(dev, pin_nr)] = pin
+            self._act_digital[(dev, pin_nr)] = PinTuple('p', pin)
 
     def setup_servo(self, dev, pin_nr, min_pulse, max_pulse, angle):
         if not self._boards[dev]:
             return
         with self._locks[dev]:
             pin = self._boards[dev].get_pin("d:{pin}:s".format(pin=pin_nr))
-            self._act_digital[(dev, pin_nr)] = pin
+            self._act_digital[(dev, pin_nr)] = PinTuple('s', pin)
             self._boards[dev].servo_config(pin_nr, min_pulse, max_pulse, angle)
 
     def change_digital(self, dev, pin_nr, value):
@@ -185,7 +197,7 @@ class ArduinoService(AbstractSystemService):
         if not self._boards[dev]:
             return
         with self._locks[dev]:
-            self._act_digital[(dev, pin_nr)].write(value)
+            self._act_digital[(dev, pin_nr)].pin.write(value)
 
     # Functions for input signals
     def handle_analog(self, obj, name, old, new):
