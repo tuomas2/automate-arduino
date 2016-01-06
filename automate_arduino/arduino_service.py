@@ -122,6 +122,7 @@ class ArduinoService(AbstractSystemService):
                 board = cls(ard_devs[i])
                 board.send_sysex(pyfirmata.SAMPLING_INTERVAL, to_two_bytes(samplerates[i]))
                 self._iterator_thread = it = Iterator.Fixed(board)
+                it.daemon = True
                 it.name = "PyFirmata thread for {dev}".format(dev=ard_devs[i])
                 board._iter = it
                 it.start()
